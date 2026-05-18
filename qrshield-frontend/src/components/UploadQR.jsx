@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { UploadCloud, FileImage, X, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import jsQR from 'jsqr';
 
 export default function UploadQR({ onUpload }) {
   const [dragActive, setDragActive] = useState(false);
@@ -30,16 +31,35 @@ export default function UploadQR({ onUpload }) {
 
     setFile(selectedFile);
 
-    // Create preview
+    // Create preview and decode QR
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result);
+      
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          if (onUpload) {
+            onUpload(code.data); // Pass the decoded text (URL)
+          }
+        } else {
+          setError("No QR code found in the image. Please ensure the QR code is clear.");
+        }
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(selectedFile);
-
-    if (onUpload) {
-      onUpload(selectedFile);
-    }
   };
 
   const handleDrop = (e) => {

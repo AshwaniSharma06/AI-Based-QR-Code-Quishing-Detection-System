@@ -1,40 +1,63 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CameraOff, Focus, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Html5Qrcode } from 'html5-qrcode';
 
 export default function CameraScanner({ onScan }) {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const scannerRef = useRef(null);
 
   const startCamera = async () => {
     setError('');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+    setIsScanning(true);
+    
+    // Give the DOM a tiny bit of time to ensure the #qr-reader div is ready
+    setTimeout(async () => {
+      try {
+        const html5QrCode = new Html5Qrcode("qr-reader");
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 }
+          },
+          (decodedText) => {
+            // Success!
+            if (onScan) {
+              // Stop scanning first, then trigger callback
+              html5QrCode.stop().then(() => {
+                setIsScanning(false);
+                onScan(decodedText);
+              }).catch(err => console.error("Failed to stop", err));
+            }
+          },
+          (errorMessage) => {
+            // This fires every frame a QR code ISN'T found. We ignore it.
+          }
+        );
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        setError('Could not access camera. Please check permissions.');
+        setIsScanning(false);
       }
-      setIsScanning(true);
-    } catch (err) {
-      console.error('Error accessing camera:', err);
-      setError('Could not access camera. Please check permissions.');
-      setIsScanning(false);
-    }
+    }, 100);
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      scannerRef.current.stop().then(() => {
+        scannerRef.current.clear();
+        setIsScanning(false);
+      }).catch(err => {
+        console.error("Failed to clear scanner", err);
+        setIsScanning(false);
+      });
+    } else {
+      setIsScanning(false);
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsScanning(false);
   };
 
   // Cleanup on unmount
@@ -51,12 +74,9 @@ export default function CameraScanner({ onScan }) {
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-600/10 animate-pulse" />
         )}
 
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isScanning ? 'opacity-100' : 'opacity-0'}`}
+        <div
+          id="qr-reader"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 [&>video]:object-cover [&>video]:w-full [&>video]:h-full ${isScanning ? 'opacity-100' : 'opacity-0'}`}
         />
 
         {/* UI Overlay */}

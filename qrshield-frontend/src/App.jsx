@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ScanLine, Upload, Camera, Menu, X, ChevronRight, Lock } from 'lucide-react';
+import { Shield, ScanLine, Upload, Camera, Menu, X, ChevronRight, Lock, ArrowLeft, Activity, Globe, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import CameraScanner from './components/CameraScanner';
+import UploadQR from './components/UploadQR';
+import AILoadingScreen from './components/AILoadingScreen';
+import ResultDashboard from './components/ResultDashboard';
 
 export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('hero'); // 'hero', 'upload', 'camera', 'result'
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -13,6 +20,39 @@ export default function App() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleProcess = (extractedUrl) => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      
+      // Since we don't have a real backend yet, we'll simulate the AI analysis.
+      // But we CAN use the real extracted URL if one was found!
+      const isMalicious = Math.random() > 0.5; // Randomly assign safe/malicious for demo variety
+
+      if (isMalicious || activeTab === 'upload') {
+        setScanResult({
+          isSafe: false,
+          url: typeof extractedUrl === 'string' ? extractedUrl : "http://secure-login-update-auth.com/verify",
+          riskScore: 92,
+          threatLevel: "CRITICAL",
+          summary: "High probability of phishing. The domain was registered recently and mimics a legitimate banking portal.",
+          warnings: ["Suspicious domain age (2 days)", "No valid SSL certificate", "Known phishing signature detected", "Hidden iframe redirect found"]
+        });
+      } else {
+        setScanResult({
+          isSafe: true,
+          url: typeof extractedUrl === 'string' ? extractedUrl : "https://menu.localcafe.com/specials",
+          riskScore: 12,
+          threatLevel: "LOW",
+          summary: "This QR code points to a safe, trusted domain with no suspicious indicators.",
+          warnings: ["Valid SSL certificate present", "Domain reputation is clean"]
+        });
+      }
+      
+      setActiveTab('result');
+    }, 12500); // Matches the 5 cycle messages (2.5s * 5)
+  };
 
   return (
     <div className="min-h-screen bg-[#050B14] text-gray-300 font-sans selection:bg-cyan-500/30 overflow-x-hidden">
@@ -27,7 +67,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <div className="flex items-center gap-2 cursor-pointer group">
+            <div 
+              className="flex items-center gap-2 cursor-pointer group"
+              onClick={() => setActiveTab('hero')}
+            >
               <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-cyan-950 border border-cyan-500/30 group-hover:border-cyan-400 transition-colors">
                 <Shield className="w-5 h-5 text-cyan-400" />
                 <div className="absolute inset-0 bg-cyan-400/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -39,10 +82,13 @@ export default function App() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#home" className="text-sm font-medium hover:text-cyan-400 transition-colors">Home</a>
+              <a href="#home" onClick={(e) => { e.preventDefault(); setActiveTab('hero'); }} className="text-sm font-medium hover:text-cyan-400 transition-colors">Home</a>
               <a href="#features" className="text-sm font-medium hover:text-cyan-400 transition-colors">Features</a>
               <a href="#about" className="text-sm font-medium hover:text-cyan-400 transition-colors">About</a>
-              <button className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 text-sm font-semibold hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all duration-300">
+              <button 
+                onClick={() => setActiveTab('camera')}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 text-sm font-semibold hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all duration-300"
+              >
                 <ScanLine className="w-4 h-4" />
                 <span>Scan QR</span>
               </button>
@@ -65,10 +111,13 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             className="absolute top-full left-0 w-full bg-[#0A1128]/95 backdrop-blur-lg border-b border-cyan-500/20 py-4 px-6 md:hidden flex flex-col gap-4"
           >
-            <a href="#home" className="text-base font-medium text-white hover:text-cyan-400">Home</a>
+            <a href="#home" onClick={() => { setActiveTab('hero'); setMobileMenuOpen(false); }} className="text-base font-medium text-white hover:text-cyan-400">Home</a>
             <a href="#features" className="text-base font-medium text-white hover:text-cyan-400">Features</a>
             <a href="#about" className="text-base font-medium text-white hover:text-cyan-400">About</a>
-            <button className="flex items-center justify-center gap-2 w-full px-5 py-3 mt-2 rounded-lg bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 font-semibold">
+            <button 
+              onClick={() => { setActiveTab('camera'); setMobileMenuOpen(false); }}
+              className="flex items-center justify-center gap-2 w-full px-5 py-3 mt-2 rounded-lg bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 font-semibold"
+            >
               <ScanLine className="w-5 h-5" />
               <span>Scan QR</span>
             </button>
@@ -104,12 +153,18 @@ export default function App() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-              <button className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-105 transition-all duration-300">
+              <button 
+                onClick={() => setActiveTab('upload')}
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-105 transition-all duration-300"
+              >
                 <Upload className="w-5 h-5" />
                 <span>Upload QR Image</span>
               </button>
               
-              <button className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 hover:border-cyan-500/50 transition-all duration-300 group">
+              <button 
+                onClick={() => setActiveTab('camera')}
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 hover:border-cyan-500/50 transition-all duration-300 group"
+              >
                 <Camera className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 transition-colors" />
                 <span>Scan with Camera</span>
               </button>
@@ -127,78 +182,188 @@ export default function App() {
             </div>
           </motion.div>
 
-          {/* Right Illustration */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-            className="relative lg:h-[600px] flex items-center justify-center"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
-            
-            <div className="relative w-full max-w-lg aspect-square">
-              {/* Outer rotating rings */}
-              <div className="absolute inset-4 border border-cyan-500/20 rounded-full animate-[spin_20s_linear_infinite]" />
-              <div className="absolute inset-8 border border-blue-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
-              
-              {/* Main Illustration Image */}
-              <div className="absolute inset-0 flex items-center justify-center p-8">
-                <div className="relative w-full h-full rounded-2xl overflow-hidden border border-cyan-500/30 shadow-[0_0_50px_rgba(34,211,238,0.15)] bg-[#0A1128]/50 backdrop-blur-sm group">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50 shadow-[0_0_10px_#22d3ee] animate-[bounce_3s_infinite]" />
-                  <img 
-                    src="/hero-illustration.png" 
-                    alt="AI QR Code Threat Detection Illustration" 
-                    className="w-full h-full object-cover mix-blend-screen opacity-90 group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#050B14] via-transparent to-transparent" />
-                  
-                  {/* Scanning line effect */}
-                  <div className="absolute top-0 left-0 w-full h-[2px] bg-cyan-400 shadow-[0_0_15px_#22d3ee] animate-[scan_3s_ease-in-out_infinite]" style={{
-                    boxShadow: '0 0 10px 2px rgba(34, 211, 238, 0.5), 0 0 20px 5px rgba(34, 211, 238, 0.3)'
-                  }} />
-                  <style>{`
-                    @keyframes scan {
-                      0%, 100% { top: 10%; opacity: 0; }
-                      10%, 90% { opacity: 1; }
-                      50% { top: 90%; }
-                    }
-                  `}</style>
-                </div>
-              </div>
-            </div>
-            
-            {/* Floating badges */}
-            <motion.div 
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-1/4 -left-4 bg-[#0A1128]/80 backdrop-blur-md border border-green-500/30 px-4 py-3 rounded-xl flex items-center gap-3 shadow-lg"
-            >
-              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-green-400" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 font-medium">Status</p>
-                <p className="text-sm font-bold text-white">Safe to Scan</p>
-              </div>
-            </motion.div>
-            
-            <motion.div 
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute bottom-1/4 -right-4 bg-[#0A1128]/80 backdrop-blur-md border border-cyan-500/30 px-4 py-3 rounded-xl flex items-center gap-3 shadow-lg"
-            >
-              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
-                <ScanLine className="w-4 h-4 text-cyan-400" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 font-medium">AI Analysis</p>
-                <p className="text-sm font-bold text-white">Threats: 0</p>
-              </div>
-            </motion.div>
+          {/* Right Area - Dynamic based on activeTab */}
+          <div className="relative lg:h-[600px] flex flex-col items-center justify-center w-full">
+            {activeTab !== 'hero' && (
+              <button 
+                onClick={() => setActiveTab('hero')}
+                className="absolute -top-12 lg:top-0 left-0 lg:-left-8 flex items-center gap-2 text-cyan-500 hover:text-cyan-400 transition-colors z-20"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back</span>
+              </button>
+            )}
 
-          </motion.div>
+            {activeTab === 'hero' && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+                className="relative w-full h-full flex items-center justify-center"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+                
+                <div className="relative w-full max-w-lg aspect-square">
+                  {/* Outer rotating rings */}
+                  <div className="absolute inset-4 border border-cyan-500/20 rounded-full animate-[spin_20s_linear_infinite]" />
+                  <div className="absolute inset-8 border border-blue-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
+                  
+                  {/* Main Illustration Image */}
+                  <div className="absolute inset-0 flex items-center justify-center p-8">
+                    <div className="relative w-full h-full rounded-2xl overflow-hidden border border-cyan-500/30 shadow-[0_0_50px_rgba(34,211,238,0.15)] bg-[#0A1128]/50 backdrop-blur-sm group">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50 shadow-[0_0_10px_#22d3ee] animate-[bounce_3s_infinite]" />
+                      <img 
+                        src="/hero-illustration.png" 
+                        alt="AI QR Code Threat Detection Illustration" 
+                        className="w-full h-full object-cover mix-blend-screen opacity-90 group-hover:scale-105 transition-transform duration-700"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#050B14] via-transparent to-transparent" />
+                      
+                      {/* Scanning line effect */}
+                      <div className="absolute top-0 left-0 w-full h-[2px] bg-cyan-400 shadow-[0_0_15px_#22d3ee] animate-[scan_3s_ease-in-out_infinite]" style={{
+                        boxShadow: '0 0 10px 2px rgba(34, 211, 238, 0.5), 0 0 20px 5px rgba(34, 211, 238, 0.3)'
+                      }} />
+                      <style>{`
+                        @keyframes scan {
+                          0%, 100% { top: 10%; opacity: 0; }
+                          10%, 90% { opacity: 1; }
+                          50% { top: 90%; }
+                        }
+                      `}</style>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Floating badges */}
+                <motion.div 
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute top-1/4 -left-4 bg-[#0A1128]/80 backdrop-blur-md border border-green-500/30 px-4 py-3 rounded-xl flex items-center gap-3 shadow-lg"
+                >
+                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Status</p>
+                    <p className="text-sm font-bold text-white">Safe to Scan</p>
+                  </div>
+                </motion.div>
+                
+                <motion.div 
+                  animate={{ y: [0, 10, 0] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                  className="absolute bottom-1/4 -right-4 bg-[#0A1128]/80 backdrop-blur-md border border-cyan-500/30 px-4 py-3 rounded-xl flex items-center gap-3 shadow-lg"
+                >
+                  <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                    <ScanLine className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">AI Analysis</p>
+                    <p className="text-sm font-bold text-white">Threats: 0</p>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {activeTab === 'upload' && (
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="w-full flex flex-col items-center"
+              >
+                <div className="w-full mb-8 text-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">Upload QR Code</h2>
+                  <p className="text-gray-400">Select an image to analyze its contents securely.</p>
+                </div>
+                <UploadQR onUpload={handleProcess} />
+              </motion.div>
+            )}
+
+            {activeTab === 'camera' && (
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="w-full flex flex-col items-center"
+              >
+                <div className="w-full mb-8 text-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">Live Camera Scan</h2>
+                  <p className="text-gray-400">Point your camera at a QR code to detect threats.</p>
+                </div>
+                <CameraScanner onScan={handleProcess} />
+              </motion.div>
+            )}
+
+            {activeTab === 'result' && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full flex flex-col items-center pt-8 lg:pt-0"
+              >
+                <ResultDashboard 
+                  result={scanResult} 
+                  onClose={() => setActiveTab('hero')} 
+                />
+              </motion.div>
+            )}
+          </div>
         </div>
       </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-24 bg-[#050B14] relative z-10 border-t border-cyan-500/10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Advanced Threat Intelligence</h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">Our system uses multi-layered analysis to detect and block malicious QR codes before they compromise your device.</p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              { icon: <ScanLine />, title: "Real-time AI Vision", desc: "Instantly extracts and analyzes QR patterns and obfuscated URLs." },
+              { icon: <Shield />, title: "Zero-Day Protection", desc: "Identifies never-before-seen phishing domains using predictive AI." },
+              { icon: <Lock />, title: "Privacy First", desc: "Your images and scans are analyzed locally or encrypted end-to-end." },
+              { icon: <Activity />, title: "Behavioral Analysis", desc: "Tracks hidden redirects and malicious iframe injections." },
+              { icon: <Globe />, title: "Global Threat DB", desc: "Cross-references URLs against millions of known phishing signatures." },
+              { icon: <CheckCircle />, title: "Safe Browsing", desc: "Provides a secure sandbox environment to preview suspicious links." }
+            ].map((f, i) => (
+              <div key={i} className="p-6 rounded-2xl bg-[#0A1128]/50 border border-cyan-500/10 hover:border-cyan-500/30 transition-colors group">
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  {f.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">{f.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section id="about" className="py-24 bg-[#0A1128] relative z-10 border-t border-cyan-500/10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 grid lg:grid-cols-2 gap-12 items-center">
+          <div className="order-2 lg:order-1 relative h-96 rounded-2xl overflow-hidden border border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/40 to-blue-900/40 mix-blend-overlay z-10" />
+            <img src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=2070&auto=format&fit=crop" alt="Cyber Security" className="w-full h-full object-cover" />
+          </div>
+          
+          <div className="order-1 lg:order-2 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium uppercase tracking-wider">
+              <AlertTriangle className="w-3 h-3" />
+              <span>The Quishing Threat</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold text-white">Why QRShield?</h2>
+            <p className="text-gray-400 leading-relaxed text-lg">
+              QR codes are inherently unreadable by humans, making them the perfect vehicle for attackers to hide malicious URLs. This technique, known as <strong>"Quishing"</strong>, bypasses traditional email filters and directly targets your mobile device.
+            </p>
+            <p className="text-gray-400 leading-relaxed">
+              QRShield acts as a protective layer between the physical world and your device. By scanning codes through our platform first, you ensure that every destination is verified by enterprise-grade threat intelligence before your browser ever makes a connection.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Render AI Loading Screen when processing */}
+      {isProcessing && <AILoadingScreen />}
     </div>
   );
 }
