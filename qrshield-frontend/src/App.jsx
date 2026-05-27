@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ScanLine, Upload, Camera, Menu, X, ChevronRight, Lock, ArrowLeft, Activity, Globe, CheckCircle, AlertTriangle } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Shield, ScanLine, Upload, Camera, Menu, X, ChevronRight, Lock, ArrowLeft, Activity, Globe, CheckCircle, AlertTriangle, Clock, Trash2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import CameraScanner from './components/CameraScanner';
 import UploadQR from './components/UploadQR';
 import AILoadingScreen from './components/AILoadingScreen';
 import ResultDashboard from './components/ResultDashboard';
+import Footer from './components/Footer';
 
 export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -12,6 +13,34 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('hero'); // 'hero', 'upload', 'camera', 'result'
   const [isProcessing, setIsProcessing] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [scanHistory, setScanHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('qrshield_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Persist history to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('qrshield_history', JSON.stringify(scanHistory));
+  }, [scanHistory]);
+
+  const addToHistory = (result) => {
+    const entry = {
+      id: Date.now(),
+      url: result.url,
+      isSafe: result.isSafe,
+      riskScore: result.riskScore,
+      threatLevel: result.threatLevel,
+      timestamp: new Date().toLocaleString(),
+    };
+    setScanHistory(prev => [entry, ...prev].slice(0, 20)); // keep last 20
+  };
+
+  const clearHistory = () => {
+    setScanHistory([]);
+    localStorage.removeItem('qrshield_history');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,37 +50,68 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleProcess = (extractedUrl) => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      
-      // Since we don't have a real backend yet, we'll simulate the AI analysis.
-      // But we CAN use the real extracted URL if one was found!
-      const isMalicious = Math.random() > 0.5; // Randomly assign safe/malicious for demo variety
+  const handleProcess = async (extractedUrl) => {
+    if (typeof extractedUrl !== 'string' || !extractedUrl) {
+        console.error("Invalid URL passed to handleProcess", extractedUrl);
+        extractedUrl = "http://example.com/suspicious-link";
+    }
 
-      if (isMalicious || activeTab === 'upload') {
-        setScanResult({
-          isSafe: false,
-          url: typeof extractedUrl === 'string' ? extractedUrl : "http://secure-login-update-auth.com/verify",
-          riskScore: 92,
-          threatLevel: "CRITICAL",
-          summary: "High probability of phishing. The domain was registered recently and mimics a legitimate banking portal.",
-          warnings: ["Suspicious domain age (2 days)", "No valid SSL certificate", "Known phishing signature detected", "Hidden iframe redirect found"]
-        });
-      } else {
-        setScanResult({
-          isSafe: true,
-          url: typeof extractedUrl === 'string' ? extractedUrl : "https://menu.localcafe.com/specials",
-          riskScore: 12,
-          threatLevel: "LOW",
-          summary: "This QR code points to a safe, trusted domain with no suspicious indicators.",
-          warnings: ["Valid SSL certificate present", "Domain reputation is clean"]
-        });
+    setIsProcessing(true);
+    
+    try {
+      // Ensure the AI loading screen shows for at least a few seconds for UX
+      const startTime = Date.now();
+      
+      const response = await fetch('http://127.0.0.1:5000/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: extractedUrl }),
+      });
+      
+      const data = await response.json();
+      
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 4000) {
+        await new Promise(resolve => setTimeout(resolve, 4000 - elapsed));
       }
       
-      setActiveTab('result');
-    }, 12500); // Matches the 5 cycle messages (2.5s * 5)
+      setIsProcessing(false);
+      
+      if (data.success && data.analysis) {
+        const resultObj = {
+          isSafe: data.analysis.status === "Safe",
+          url: data.url,
+          riskScore: data.analysis.risk_score,
+          threatLevel: data.analysis.risk_level.toUpperCase(),
+          summary: data.analysis.status === "Safe" 
+            ? "This QR code points to a safe domain with no suspicious indicators."
+            : "Suspicious indicators found. Proceed with caution.",
+          warnings: data.analysis.reasons || []
+        };
+        setScanResult(resultObj);
+        addToHistory(resultObj);
+      } else {
+        throw new Error(data.error || "Analysis failed");
+      }
+      
+    } catch (error) {
+      console.error("Error communicating with backend:", error);
+      setIsProcessing(false);
+      const errorResult = {
+        isSafe: false,
+        url: extractedUrl,
+        riskScore: 50,
+        threatLevel: "UNKNOWN",
+        summary: "Could not connect to AI analysis server. Please try again later.",
+        warnings: ["Backend connection failed."]
+      };
+      setScanResult(errorResult);
+      addToHistory(errorResult);
+    }
+    
+    setActiveTab('result');
   };
 
   return (
@@ -361,6 +421,84 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      {/* Scan History Section */}
+      {scanHistory.length > 0 && (
+        <section id="history" className="py-24 bg-[#050B14] relative z-10 border-t border-cyan-500/10">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-12">
+              <div>
+                <h2 className="text-3xl md:text-5xl font-bold text-white mb-2">Recent Scans</h2>
+                <p className="text-gray-400">Your scan history is stored locally on this device.</p>
+              </div>
+              <button
+                onClick={clearHistory}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/20 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Clear History</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <AnimatePresence>
+                {scanHistory.map((entry, i) => (
+                  <motion.div
+                    key={entry.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ delay: i * 0.05 }}
+                    className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
+                      entry.isSafe
+                        ? 'bg-green-500/5 border-green-500/15 hover:border-green-500/30'
+                        : 'bg-red-500/5 border-red-500/15 hover:border-red-500/30'
+                    }`}
+                  >
+                    {/* Status Indicator */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                      entry.isSafe ? 'bg-green-500/10' : 'bg-red-500/10'
+                    }`}>
+                      {entry.isSafe
+                        ? <CheckCircle className="w-5 h-5 text-green-400" />
+                        : <AlertTriangle className="w-5 h-5 text-red-400" />
+                      }
+                    </div>
+
+                    {/* URL and details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{entry.url}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${
+                          entry.isSafe ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {entry.threatLevel}
+                        </span>
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {entry.timestamp}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Risk Score Badge */}
+                    <div className={`px-3 py-1.5 rounded-lg text-sm font-bold shrink-0 ${
+                      entry.isSafe
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    }`}>
+                      {entry.riskScore}%
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Footer */}
+      <Footer />
 
       {/* Render AI Loading Screen when processing */}
       {isProcessing && <AILoadingScreen />}
