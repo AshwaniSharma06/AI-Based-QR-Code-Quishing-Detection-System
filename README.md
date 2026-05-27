@@ -41,6 +41,7 @@ QR codes are inherently unreadable by humans, making them the perfect vehicle fo
 - **Python 3** — Core backend language
 - **Flask** — Lightweight web framework
 - **Flask-CORS** — Cross-origin resource sharing
+- **Scikit-Learn & Pandas** — Machine Learning (Random Forest Classifier)
 
 ---
 
@@ -69,6 +70,9 @@ QR Shield-AI-Frontend/
 │
 ├── qrshield-backend/           # Python Flask Backend
 │   ├── app.py                  # Main API server
+│   ├── train_model.py          # ML training script
+│   ├── url_model.pkl           # Trained Random Forest model
+│   ├── dataset_phishing.csv    # Training dataset (11k+ URLs)
 │   ├── requirements.txt        # Python dependencies
 │   └── venv/                   # Virtual environment
 │
@@ -89,7 +93,7 @@ git clone https://github.com/AshwaniSharma06/AI-Based-QR-Code-Quishing-Detection
 cd "QR Shield-AI-Frontend"
 ```
 
-### 2. Start the Backend (Flask)
+### 2. Start the Backend (Flask + ML)
 ```bash
 cd qrshield-backend
 python -m venv venv
@@ -98,6 +102,7 @@ python -m venv venv
 pip install -r requirements.txt
 python app.py
 ```
+*(The backend will automatically load the pre-trained `url_model.pkl` Random Forest model.)*
 The backend will start on **http://127.0.0.1:5000**
 
 ### 3. Start the Frontend (React + Vite)
@@ -142,7 +147,6 @@ The frontend will start on **http://localhost:5173**
     "status": "Safe",
     "reasons": [
       "Domain is recognized as a trusted service.",
-      "Valid and well-known domain detected.",
       "Connection uses HTTPS encryption."
     ]
   }
@@ -154,16 +158,10 @@ The frontend will start on **http://localhost:5173**
 ## 🧠 How the AI Detection Works
 
 1. **QR Decoding** — The frontend uses `jsQR` (upload) or `html5-qrcode` (camera) to extract the embedded URL from the QR image.
-2. **Trusted Domain Check** — The backend first checks the URL against a whitelist of 30+ well-known domains (Google, GitHub, YouTube, etc.).
-3. **Heuristic Analysis** — For unknown domains, the engine evaluates 7 risk signals:
-   - HTTP vs HTTPS scheme
-   - Raw IP address usage
-   - Suspicious TLDs (`.xyz`, `.tk`, `.pw`, etc.)
-   - Excessive URL length
-   - Subdomain abuse
-   - Phishing keywords (`login`, `verify`, `password`, etc.)
-   - URL obfuscation characters (`@`, double `//`)
-4. **Risk Scoring** — Each signal adds weighted points. The total determines the threat level: **Safe** (<35), **Suspicious** (35–59), or **Malicious** (60+).
+2. **Safe Payments & Whitelist Check** — The backend first quickly verifies if the URL is a safe payment scheme (UPI, GPay, etc.) or belongs to a whitelist of 40+ trusted domains (Google, GitHub, Razorpay, etc.).
+3. **Feature Extraction** — For unknown domains, the Python backend dynamically extracts **27 structural/lexical features** from the URL string without ever visiting the site. Features include: URL length, count of dots, presence of an IP address, ratio of digits, use of obfuscation characters, etc.
+4. **Machine Learning Inference** — The extracted features are passed into a pre-trained **Random Forest Classifier** (`scikit-learn`). The model evaluates the structural patterns and outputs an exact probability (0-100%) that the URL is a phishing attack.
+5. **Risk Scoring** — The model's probability translates into the final threat level: **Safe** (<35), **Suspicious** (35–59), or **Malicious** (60+).
 
 ---
 
