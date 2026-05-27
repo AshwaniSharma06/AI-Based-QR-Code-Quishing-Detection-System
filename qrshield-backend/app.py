@@ -50,6 +50,25 @@ def analyze_url(url):
     # Strip port number if present (e.g. example.com:8080)
     domain_no_port = domain.split(':')[0]
 
+    # ── Safe payment schemes ──
+    # UPI, PayPal.me, PhonePe, and similar payment QR codes use custom
+    # URI schemes (e.g. upi://pay?pa=merchant@ybl).  These are
+    # legitimate mobile payment protocols, not web URLs.
+    safe_payment_schemes = ['upi', 'paytmmp', 'phonepe', 'gpay', 'bhim']
+
+    if parsed_url.scheme.lower() in safe_payment_schemes:
+        safe_reasons = [
+            "Recognized as a legitimate payment QR code.",
+            f"Payment scheme detected: {parsed_url.scheme.upper()}.",
+            "This is a standard mobile payment protocol.",
+        ]
+        return {
+            "risk_score": 2,
+            "risk_level": "Low Risk",
+            "status": "Safe",
+            "reasons": safe_reasons,
+        }
+
     # ── Trusted-domain whitelist ──
     # If the domain (or its parent) is a well-known service, it's almost
     # certainly not a quishing attack.  Return early with a clean score.
@@ -59,9 +78,13 @@ def analyze_url(url):
         'microsoft.com', 'apple.com', 'amazon.com', 'wikipedia.org',
         'whatsapp.com', 'netflix.com', 'spotify.com', 'stackoverflow.com',
         'reddit.com', 'medium.com', 'zoom.us', 'discord.com',
-        'paypal.com', 'dropbox.com', 'notion.so', 'figma.com',
+        'paypal.com', 'paypal.me', 'dropbox.com', 'notion.so', 'figma.com',
         'vercel.app', 'netlify.app', 'herokuapp.com',
         'bit.ly', 'tinyurl.com', 'forms.gle', 'docs.google.com',
+        # Payment and banking platforms
+        'razorpay.com', 'paytm.com', 'phonepe.com', 'gpay.com',
+        'stripe.com', 'square.com', 'venmo.com', 'cashapp.com',
+        'payu.in', 'instamojo.com', 'bhimupi.org.in',
     ]
 
     is_trusted = any(
@@ -86,8 +109,11 @@ def analyze_url(url):
     # ── Heuristic checks (only for non-trusted domains) ──
 
     # 1. Scheme check
-    if parsed_url.scheme not in ('https', ''):
+    if parsed_url.scheme not in ('https', 'http', ''):
         risk_score += 15
+        reasons.append("Non-standard URL scheme detected.")
+    elif parsed_url.scheme == 'http':
+        risk_score += 10
         reasons.append("Connection is not secure (HTTP instead of HTTPS).")
 
     # 2. IP-address instead of domain name
@@ -122,9 +148,15 @@ def analyze_url(url):
         reasons.append(f"Suspicious keywords found: {', '.join(found_keywords)}.")
 
     # 7. Special characters often used in obfuscation
-    if '@' in url or url.count('//') > 1:
+    # Note: '@' is normal in mailto: links and payment URIs, so only flag
+    # it when it appears in http/https URLs where it's used for credential
+    # stuffing or URL obfuscation (e.g. http://trusted.com@evil.com)
+    if parsed_url.scheme in ('http', 'https') and '@' in url:
         risk_score += 20
-        reasons.append("URL contains obfuscation characters (@ or double //).")
+        reasons.append("URL contains @ character — possible credential obfuscation.")
+    if url.count('//') > 1:
+        risk_score += 15
+        reasons.append("URL contains multiple double-slashes — possible path obfuscation.")
 
     # Cap score at 100
     risk_score = min(risk_score, 100)
