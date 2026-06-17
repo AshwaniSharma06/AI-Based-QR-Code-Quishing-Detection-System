@@ -98,16 +98,88 @@ export default function App() {
       }
       
     } catch (error) {
-      console.error("Error communicating with backend:", error);
+      console.error("Error communicating with backend, running client-side heuristics fallback:", error);
       setIsProcessing(false);
+      
+      // Client-side heuristics fallback logic
+      let riskScore = 0;
+      const warnings = ["Offline Verification: AI server is waking up or offline."];
+      let isSafe = true;
+      let threatLevel = "LOW RISK";
+      let summary = "";
+      
+      try {
+        // Simple URL parsing
+        let cleanUrl = extractedUrl;
+        if (!/^https?:\/\//i.test(cleanUrl) && !/^upi:\/\//i.test(cleanUrl)) {
+          cleanUrl = 'http://' + cleanUrl;
+        }
+        
+        const parsed = new URL(cleanUrl);
+        const hostname = parsed.hostname.toLowerCase();
+        
+        // Safe payment schemes check
+        const safePaymentSchemes = ['upi', 'paytmmp', 'phonepe', 'gpay', 'bhim'];
+        const scheme = parsed.protocol.replace(':', '').toLowerCase();
+        
+        if (safePaymentSchemes.includes(scheme)) {
+          riskScore = 2;
+          warnings.push(`Payment scheme detected: ${scheme.toUpperCase()}.`);
+        } else {
+          // Check HTTP
+          if (parsed.protocol === 'http:') {
+            riskScore += 15;
+            warnings.push("Warning: Connection is not secure (HTTP).");
+          }
+          
+          // Check raw IP
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+            riskScore += 35;
+            warnings.push("Warning: URL uses a raw IP address instead of a domain name.");
+          }
+          
+          // Check suspicious TLDs
+          const suspiciousTlds = ['.xyz', '.top', '.pw', '.cc', '.tk', '.ml', '.ga', '.cf', '.gq'];
+          if (suspiciousTlds.some(tld => hostname.endsWith(tld))) {
+            riskScore += 20;
+            warnings.push("Warning: Domain uses a top-level domain frequently associated with spam.");
+          }
+          
+          // Whitelist check
+          const trustedDomains = [
+            'google.com', 'youtube.com', 'facebook.com', 'instagram.com',
+            'twitter.com', 'x.com', 'linkedin.com', 'github.com',
+            'microsoft.com', 'apple.com', 'amazon.com', 'wikipedia.org',
+            'whatsapp.com', 'netflix.com', 'spotify.com', 'stackoverflow.com',
+            'reddit.com', 'paypal.com', 'paypal.me', 'docs.google.com', 'forms.gle'
+          ];
+          const isTrusted = trustedDomains.some(td => hostname === td || hostname.endsWith('.' + td));
+          
+          if (isTrusted) {
+            riskScore = 5;
+            warnings.push("Domain is recognized as a trusted service.");
+          }
+        }
+      } catch (err) {
+        riskScore += 25;
+        warnings.push("Warning: URL format could not be fully parsed.");
+      }
+      
+      isSafe = riskScore < 35;
+      threatLevel = riskScore >= 60 ? "HIGH RISK" : riskScore >= 35 ? "MEDIUM RISK" : "LOW RISK";
+      summary = isSafe 
+        ? "No significant structural threats detected by offline scanner."
+        : "Suspicious indicators found by offline scanner. Proceed with caution.";
+        
       const errorResult = {
-        isSafe: false,
+        isSafe,
         url: extractedUrl,
-        riskScore: 50,
-        threatLevel: "UNKNOWN",
-        summary: "Could not connect to AI analysis server. Please try again later.",
-        warnings: ["Backend connection failed."]
+        riskScore,
+        threatLevel,
+        summary,
+        warnings
       };
+      
       setScanResult(errorResult);
       addToHistory(errorResult);
     }
