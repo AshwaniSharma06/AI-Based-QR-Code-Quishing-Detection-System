@@ -62,7 +62,8 @@ export default function App() {
       // Ensure the AI loading screen shows for at least a few seconds for UX
       const startTime = Date.now();
       
-      const response = await fetch('http://127.0.0.1:5000/api/analyze', {
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+      const response = await fetch(`${backendUrl}/api/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

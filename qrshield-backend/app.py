@@ -237,4 +237,9 @@ def analyze_url(url):
     }
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Bind to PORT if provided by environment, default to 5000
+    port = int(os.environ.get("PORT", 5000))
+    # Run on 0.0.0.0 so the app is accessible externally in production
+    # Disable debug mode in production, enable if FLASK_ENV=development
+    debug = os.environ.get("FLASK_ENV") == "development"
+    app.run(host="0.0.0.0", port=port, debug=debug)
